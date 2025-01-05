@@ -1,5 +1,1 @@
-{
-  "storage": {
-    "rules": "storage.rules"
-  }
-}
+{"flutter":{"platforms":{"dart":{"lib/firebase_options.dart":{"projectId":"nasaapp-446811","configurations":{"web":"1:669691510276:web:58ea736df6d06727583f51"}}}}}}
