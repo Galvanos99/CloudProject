@@ -1,13 +1,6 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'firebase_options.dart';
-import 'login_screen.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+void main() {
   runApp(MyApp());
 }
 
@@ -15,9 +8,22 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'NASA Search App',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: LoginScreen(),
+      title: 'Flutter App',
+      home: LoginScreen(), // Tutaj ustawiamy pierwszy ekran aplikacji
+    );
+  }
+}
+
+class LoginScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Login'),
+      ),
+      body: Center(
+        child: Text('Ekran logowania'), // Tymczasowa treść
+      ),
     );
   }
 }
