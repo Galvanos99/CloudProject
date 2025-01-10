@@ -1,9 +1,9 @@
-# CloudProject NasaApp
+# CloudProject nasapp
 
 # TODO NEXT :  
 
 stworzyć wersje apki android, 
-stworzyć funkcję pomniejszania obrazów, 
+    - stworzyć funkcję pomniejszania obrazów,
 
 analityka, 
     dodać zliczenie ile plików uploaded
