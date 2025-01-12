@@ -1,39 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart' as rtdb; // Alias
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:http/http.dart' as http; // Dodanie http do wywołania funkcji chmurowej
 import 'login_screen.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-
-// Adres URL Twojej funkcji Firebase Cloud
-const String cloudFunctionUrl = 'https://us-central1-nasaapp-446811.cloudfunctions.net/createThumbnails';
-
-Future<String?> createThumbnail(String imageUrl, int width, int height) async {
-  try {
-    final response = await http.post(
-      Uri.parse(cloudFunctionUrl),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'imageUrl': imageUrl,
-        'width': width,
-        'height': height,
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      final responseData = json.decode(response.body);
-      // Sprawdzamy, czy URL miniatury został zwrócony
-      return responseData['thumbnailUrl'];
-    } else {
-      print('Failed to create thumbnail: ${response.statusCode}');
-      return null;
-    }
-  } catch (e) {
-    print('Error while creating thumbnail: $e');
-    return null;
-  }
-}
 
 class HomeScreenAndroid extends StatefulWidget {
   @override
@@ -49,6 +20,8 @@ class _HomeScreenState extends State<HomeScreenAndroid> {
   bool _isLoading = false;
   int _limit = 6; // Number of images per page
   String? _lastLoadedKey; // To track pagination
+  final String _cloudFunctionUrl =
+      'https://us-central1-nasaapp-446811.cloudfunctions.net/createThumbnails';
 
   @override
   void initState() {
@@ -69,131 +42,96 @@ class _HomeScreenState extends State<HomeScreenAndroid> {
     return uri.pathSegments.last; // Pobiera ostatni segment, czyli nazwę pliku
   }
 
-Future<void> _fetchImages({bool loadMore = false}) async {
-  if (_isLoading) return;
-  setState(() {
-    _isLoading = true;
-  });
-
-  try {
-    rtdb.Query query = _dbRef.orderByKey().limitToFirst(_limit);
-    if (loadMore && _lastLoadedKey != null) {
-      query = query.startAfter(_lastLoadedKey);
+  Future<bool> _checkIfThumbnailExists(String thumbnailPath) async {
+    try {
+      final ref = FirebaseStorage.instance.ref(thumbnailPath);
+      await ref.getDownloadURL();
+      return true;
+    } catch (e) {
+      return false; // Jeśli miniatura nie istnieje
     }
-
-    final snapshot = await query.get();
-    final data = snapshot.value as Map?;
-
-    if (data != null) {
-      final List<Map<String, dynamic>> images = [];
-      for (var entry in data.entries) {
-        final image = Map<String, dynamic>.from(entry.value);
-        final id = entry.key;
-
-        image['id'] = id;
-
-        // Obsługa ścieżek względnych
-        final filePath = image['url'];
-        if (filePath != null) {
-          try {
-            final relativePath = filePath.startsWith('http')
-                ? _getRelativePathFromUrl(filePath)
-                : filePath;
-
-            final ref = FirebaseStorage.instance.ref(relativePath);
-            final url = await ref.getDownloadURL();
-            image['url'] = url;
-
-            // Jeśli nie ma miniatury, tworzysz ją
-            if (image['thumbnailURL'] == null) {
-              final thumbnailUrl = await createThumbnail(image['url'], 600, 800);
-              if (thumbnailUrl != null) {
-                setState(() {
-                  image['thumbnailURL'] = thumbnailUrl;
-                });
-              }
-            }
-            images.add(image);
-          } catch (e) {
-            print('Failed to load image URL for $filePath: $e');
-          }
-        }
-      }
-
-      setState(() {
-        _images.addAll(images);
-        _filteredImages = _images;
-        if (images.isNotEmpty) {
-          _lastLoadedKey = images.last['id'] as String;
-        }
-      });
-    }
-  } catch (e) {
-    print('Error fetching images: $e');
-  } finally {
-    setState(() {
-      _isLoading = false;
-    });
   }
-}
 
-  void _searchImagesInDatabase() async {
-    String query = _searchController.text.trim();
+  Future<void> _createThumbnail(String imageUrl) async {
+    try {
+      final response = await http.post(
+        Uri.parse(_cloudFunctionUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'imageUrl': imageUrl, 'width': 600, 'height': 800}),
+      );
 
-    if (query.isEmpty) {
-      // Jeśli pole wyszukiwania jest puste, resetuj listę obrazów
-      setState(() {
-        _filteredImages = _images;
-      });
-      return;
+      if (response.statusCode == 200) {
+        print('Thumbnail created successfully: ${jsonDecode(response.body)}');
+      } else {
+        print('Failed to create thumbnail: ${response.body}');
+      }
+    } catch (e) {
+      print('Error while creating thumbnail: $e');
     }
+  }
 
+  Future<void> _fetchImages({bool loadMore = false}) async {
+    if (_isLoading) return; // Zapobiegamy wielokrotnym jednoczesnym ładowaniom
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Pobieramy wszystkie wpisy z bazy danych, które pasują do frazy wyszukiwania
-      final snapshot = await _dbRef.get();
+      // Przygotowanie zapytania do bazy danych
+      rtdb.Query query = _dbRef.orderByKey().limitToFirst(_limit);
+      if (loadMore && _lastLoadedKey != null) {
+        query = query.startAfter(_lastLoadedKey);
+      }
+
+      // Pobranie danych z Firebase Realtime Database
+      final snapshot = await query.get();
       final data = snapshot.value as Map?;
 
       if (data != null) {
-        final List<Map<String, dynamic>> searchResults = [];
+        final List<Map<String, dynamic>> images = [];
         for (var entry in data.entries) {
           final image = Map<String, dynamic>.from(entry.value);
-          final title = image['title']?.toLowerCase() ?? '';
-          final description = image['description']?.toLowerCase() ?? '';
+          final id = entry.key;
 
-          // Porównujemy tytuły i opisy z frazą wyszukiwania
-          if (title.contains(query.toLowerCase()) ||
-              description.contains(query.toLowerCase())) {
-            image['id'] = entry.key;
+          image['id'] = id;
 
-            // Pobieramy URL zdjęcia, aby wyświetlić go w aplikacji
-            final filePath = image['url'];
-            if (filePath != null) {
-              try {
-                final relativePath = filePath.startsWith('http')
-                    ? _getRelativePathFromUrl(filePath)
-                    : filePath;
-                final ref = FirebaseStorage.instance.ref(relativePath);
-                final url = await ref.getDownloadURL();
-                image['url'] = url;
-                searchResults.add(image);
-              } catch (e) {
-                print('Failed to load image URL for $filePath: $e');
+          // Obsługa ścieżek względnych z katalogiem thumbnails
+          final filePath = image['url'];
+          if (filePath != null) {
+            try {
+              final relativePath = filePath.startsWith('http')
+                  ? _getRelativePathFromUrl(filePath)
+                  : filePath;
+
+              final thumbnailPath = 'thumbnails/$relativePath'; // Dodanie katalogu thumbnails
+              final thumbnailExists = await _checkIfThumbnailExists(thumbnailPath);
+
+              if (!thumbnailExists) {
+                await _createThumbnail(filePath); // Tworzymy miniaturę
+                await Future.delayed(Duration(seconds: 5)); // Czekamy na wygenerowanie miniatury
               }
+
+              final ref = FirebaseStorage.instance.ref(thumbnailPath);
+              final url = await ref.getDownloadURL();
+              image['url'] = url;
+              images.add(image);
+            } catch (e) {
+              print('Failed to load image URL for $filePath: $e');
             }
           }
         }
 
-        // Aktualizujemy listę obrazów w stanie
+        // Aktualizacja stanu aplikacji
         setState(() {
-          _filteredImages = searchResults;
+          _images.addAll(images);
+          _filteredImages = _images;
+          if (images.isNotEmpty) {
+            _lastLoadedKey = images.last['id'] as String;
+          }
         });
       }
     } catch (e) {
-      print('Error during search: $e');
+      print('Error fetching images: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -233,7 +171,7 @@ Future<void> _fetchImages({bool loadMore = false}) async {
                 style: TextStyle(color: Colors.white),
                 onSubmitted: (_) {
                   // Wywołujemy wyszukiwanie tylko po naciśnięciu "Enter"
-                  _searchImagesInDatabase();
+                  _fetchImages();
                 },
               ),
             ),
@@ -242,19 +180,17 @@ Future<void> _fetchImages({bool loadMore = false}) async {
                 itemCount: _filteredImages.length,
                 itemBuilder: (context, index) {
                   final image = _filteredImages[index];
-                  final thumbnailUrl = image['thumbnailURL'] ?? image['url'];  // Użyj miniatury, jeśli istnieje
-
                   return Container(
                     margin: const EdgeInsets.symmetric(vertical: 8.0),
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.white),
-                      borderRadius: BorderRadius.circular( 8 ),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Image.network(
-                          thumbnailUrl,
+                          image['url'],
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) => Center(
                             child: Icon(Icons.error),
