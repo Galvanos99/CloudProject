@@ -16,7 +16,7 @@ USER appuser
 RUN  pip install -r requirements.txt
 
 
-COPY fetchNasaImage.py /app
+COPY fetchNasaImage_new.py /app
 
 
-ENTRYPOINT ["python3", "fetchNasaImage.py"]
+ENTRYPOINT ["python3", "fetchNasaImage_new.py"]
