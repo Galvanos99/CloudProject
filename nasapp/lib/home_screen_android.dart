@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart' as rtdb; // Alias
+import 'package:firebase_database/firebase_database.dart' as rtdb;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:http/http.dart' as http; // Dodanie http do wywołania funkcji chmurowej
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
 import 'login_screen.dart';
 
 class HomeScreenAndroid extends StatefulWidget {
@@ -18,15 +19,22 @@ class _HomeScreenState extends State<HomeScreenAndroid> {
   List<Map<String, dynamic>> _images = [];
   List<Map<String, dynamic>> _filteredImages = [];
   bool _isLoading = false;
-  int _limit = 6; // Number of images per page
-  String? _lastLoadedKey; // To track pagination
+  int _limit = 6;
+  String? _lastLoadedKey;
   final String _cloudFunctionUrl =
       'https://us-central1-nasaapp-446811.cloudfunctions.net/createThumbnails';
+
+  bool _isCreatingThumbnails = false;
+
 
   @override
   void initState() {
     super.initState();
-    _fetchImages(); // Wczytujemy pierwsze 6 zdjęć
+    _fetchImages().then((_) {
+      setState(() {
+        _filteredImages = List.from(_images);
+      });
+    });
   }
 
   Future<void> _logout() async {
@@ -37,110 +45,180 @@ class _HomeScreenState extends State<HomeScreenAndroid> {
     );
   }
 
-  String _getRelativePathFromUrl(String fullUrl) {
-    Uri uri = Uri.parse(fullUrl);
-    return uri.pathSegments.last; // Pobiera ostatni segment, czyli nazwę pliku
-  }
+Future<void> _createThumbnail(String imageUrl) async {
+  setState(() {
+    _isCreatingThumbnails = true;
+  });
 
-  Future<bool> _checkIfThumbnailExists(String thumbnailPath) async {
-    try {
-      final ref = FirebaseStorage.instance.ref(thumbnailPath);
-      await ref.getDownloadURL();
-      return true;
-    } catch (e) {
-      return false; // Jeśli miniatura nie istnieje
-    }
-  }
+  try {
+    final response = await http.post(
+      Uri.parse(_cloudFunctionUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'imageUrl': imageUrl, 'width': 600, 'height': 800}),
+    );
+    
 
-  Future<void> _createThumbnail(String imageUrl) async {
-    try {
-      final response = await http.post(
-        Uri.parse(_cloudFunctionUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'imageUrl': imageUrl, 'width': 600, 'height': 800}),
-      );
+      // Zwiększenie licznika w Firestore
+        final analyticsRef = FirebaseFirestore.instance
+            .collection('analytics')
+            .doc('create_thumbnails');
 
-      if (response.statusCode == 200) {
-        print('Thumbnail created successfully: ${jsonDecode(response.body)}');
-      } else {
-        print('Failed to create thumbnail: ${response.body}');
-      }
-    } catch (e) {
-      print('Error while creating thumbnail: $e');
-    }
-  }
+        FirebaseFirestore.instance.runTransaction((transaction) async {
+          final snapshot = await transaction.get(analyticsRef);
 
-  Future<void> _fetchImages({bool loadMore = false}) async {
-    if (_isLoading) return; // Zapobiegamy wielokrotnym jednoczesnym ładowaniom
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // Przygotowanie zapytania do bazy danych
-      rtdb.Query query = _dbRef.orderByKey().limitToFirst(_limit);
-      if (loadMore && _lastLoadedKey != null) {
-        query = query.startAfter(_lastLoadedKey);
-      }
-
-      // Pobranie danych z Firebase Realtime Database
-      final snapshot = await query.get();
-      final data = snapshot.value as Map?;
-
-      if (data != null) {
-        final List<Map<String, dynamic>> images = [];
-        for (var entry in data.entries) {
-          final image = Map<String, dynamic>.from(entry.value);
-          final id = entry.key;
-
-          image['id'] = id;
-
-          // Obsługa ścieżek względnych z katalogiem thumbnails
-          final filePath = image['url'];
-          if (filePath != null) {
-            try {
-              final relativePath = filePath.startsWith('http')
-                  ? _getRelativePathFromUrl(filePath)
-                  : filePath;
-
-              final thumbnailPath = 'thumbnails/$relativePath'; // Dodanie katalogu thumbnails
-              final thumbnailExists = await _checkIfThumbnailExists(thumbnailPath);
-
-              if (!thumbnailExists) {
-                await _createThumbnail(filePath); // Tworzymy miniaturę
-                await Future.delayed(Duration(seconds: 5)); // Czekamy na wygenerowanie miniatury
-              }
-
-              final ref = FirebaseStorage.instance.ref(thumbnailPath);
-              final url = await ref.getDownloadURL();
-              image['url'] = url;
-              images.add(image);
-            } catch (e) {
-              print('Failed to load image URL for $filePath: $e');
+          if (snapshot.exists) {
+            final currentCounter = snapshot['counter'] ?? 0; // Pobieramy licznik, jeśli istnieje, lub 0
+            if (currentCounter is int) {
+              transaction.update(analyticsRef, {'counter': currentCounter + 1});
+            } else {
+              transaction.update(analyticsRef, {'counter': 1}); // Jeśli typ jest niepoprawny, ustawiamy na 1
             }
-          }
-        }
-
-        // Aktualizacja stanu aplikacji
-        setState(() {
-          _images.addAll(images);
-          _filteredImages = _images;
-          if (images.isNotEmpty) {
-            _lastLoadedKey = images.last['id'] as String;
+          } else {
+            transaction.set(analyticsRef, {'counter': 1}); // Jeżeli dokument nie istnieje, ustawiamy licznik na 1
           }
         });
+
+
+    if (response.statusCode == 200) {
+      print('Thumbnail created successfully: ${jsonDecode(response.body)}');
+    } else {
+      print('Failed to create thumbnail: ${response.body}');
+    }
+  } catch (e) {
+    print('Error while creating thumbnail: $e');
+  } finally {
+    setState(() {
+      _isCreatingThumbnails = false;
+    });
+  }
+}
+
+
+
+Future<void> _fetchImages({bool loadMore = false}) async {
+  if (_isLoading) return;
+  setState(() {
+    _isLoading = true;
+  });
+
+  try {
+    rtdb.Query query = _dbRef.orderByKey().limitToFirst(_limit);
+    if (loadMore && _lastLoadedKey != null) {
+      query = query.startAfter(_lastLoadedKey);
+    }
+
+    final snapshot = await query.get();
+    final data = snapshot.value as Map?;
+
+    if (data != null) {
+      final List<Map<String, dynamic>> images = [];
+      for (var entry in data.entries) {
+        final image = Map<String, dynamic>.from(entry.value);
+        final id = entry.key;
+
+        image['id'] = id;
+
+        if (_images.any((img) => img['id'] == id)) {
+          continue;
+        }
+
+        final filePath = image['url'];
+          if (filePath != null) {
+            final thumbnailPath = 'thumbnails/${Uri.parse(filePath).pathSegments.last}';
+            final ref = FirebaseStorage.instance.ref(thumbnailPath);
+            try {
+              // Sprawdź, czy miniatura istnieje
+              final url = await ref.getDownloadURL();
+              image['url'] = url;
+            } catch (e) {
+              // Jeśli miniatura nie istnieje, utwórz ją
+              print('Thumbnail not found. Creating one for $filePath...');
+              await _createThumbnail(filePath);
+
+              // Poczekaj, aż miniatura zostanie utworzona i pobierz jej URL
+              final url = await ref.getDownloadURL();
+              image['url'] = url;
+            }
+            images.add(image);
+          }
       }
-    } catch (e) {
-      print('Error fetching images: $e');
-    } finally {
+
       setState(() {
-        _isLoading = false;
+        _images.addAll(images);
+        _filteredImages = _images;
+
+        if (images.isNotEmpty) {
+          _lastLoadedKey = images.last['id'] as String;
+        } else {
+          _lastLoadedKey = null;
+        }
       });
     }
+  } catch (e) {
+    print('Error fetching images: $e');
+  } finally {
+    setState(() {
+      _isLoading = false;
+    });
   }
+}
+
+
+Future<void> _searchThumbnailsInStorage(String query) async {
+  if (query.isEmpty) {
+    setState(() {
+      _filteredImages = List.from(_images);
+    });
+    return;
+  }
+
+  setState(() {
+    _isLoading = true;
+  });
+
+  try {
+    final List<Map<String, dynamic>> results = [];
+    final storageRef = FirebaseStorage.instance.ref('thumbnails');
+    final ListResult listResult = await storageRef.listAll();
+
+    for (var item in listResult.items) {
+      final name = item.name.toLowerCase();
+      if (name.contains(query.toLowerCase())) {
+        final url = await item.getDownloadURL();
+        results.add({
+          'url': url,
+          'title': _formatTitle(item.name),
+        });
+      }
+    }
+
+    setState(() {
+      _filteredImages = results;
+    });
+  } catch (e) {
+    print('Error searching thumbnails in storage: $e');
+  } finally {
+    setState(() {
+      _isLoading = false;
+    });
+  }
+}
+
+
+String _formatTitle(String fileName) {
+  final nameWithoutExtension = fileName.split('.').first; // Usuwamy rozszerzenie
+  return nameWithoutExtension.replaceAll('_', ' '); // Zamieniamy "_" na spacje
+}
+
 
   @override
   Widget build(BuildContext context) {
+    if (_isCreatingThumbnails) {
+      return Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.black,
@@ -161,62 +239,84 @@ class _HomeScreenState extends State<HomeScreenAndroid> {
           children: [
             Padding(
               padding: const EdgeInsets.all(8.0),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  labelText: 'Search',
-                  labelStyle: TextStyle(color: Colors.white),
-                  border: OutlineInputBorder(),
-                ),
-                style: TextStyle(color: Colors.white),
-                onSubmitted: (_) {
-                  // Wywołujemy wyszukiwanie tylko po naciśnięciu "Enter"
-                  _fetchImages();
-                },
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        labelText: 'Search',
+                        labelStyle: TextStyle(color: Colors.white),
+                        border: OutlineInputBorder(),
+                      ),
+                      style: TextStyle(color: Colors.white),
+                      onSubmitted: _searchThumbnailsInStorage,
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: () =>
+                        _searchThumbnailsInStorage(_searchController.text),
+                    child: Text('Search'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                    ),
+                  ),
+                ],
               ),
             ),
             Expanded(
-              child: ListView.builder(
-                itemCount: _filteredImages.length,
-                itemBuilder: (context, index) {
-                  final image = _filteredImages[index];
-                  return Container(
-                    margin: const EdgeInsets.symmetric(vertical: 8.0),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.white),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Image.network(
-                          image['url'],
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Center(
-                            child: Icon(Icons.error),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.all(8.0),
-                          color: Colors.black54,
+              child: _isCreatingThumbnails
+                  ? Center(child: CircularProgressIndicator())
+                  : _filteredImages.isEmpty
+                      ? Center(
                           child: Text(
-                            image['title'] ?? 'No title',
+                            'No results found',
                             style: TextStyle(color: Colors.white),
-                            textAlign: TextAlign.center,
                           ),
+                        )
+                      : ListView.builder(
+                          itemCount: _filteredImages.length,
+                          itemBuilder: (context, index) {
+                            final image = _filteredImages[index];
+                            return Container(
+                              margin: const EdgeInsets.symmetric(vertical: 8.0),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.white),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Image.network(
+                                    image['url'],
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => Center(
+                                      child: Icon(Icons.error),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.all(8.0),
+                                    color: Colors.black54,
+                                    child: Text(
+                                      image['title'] ?? 'No title',
+                                      style: TextStyle(color: Colors.white),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
-                      ],
-                    ),
-                  );
-                },
-              ),
             ),
             if (_isLoading)
               Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: CircularProgressIndicator(),
               ),
-            if (!_isLoading && _filteredImages.length >= _limit)
+              if (!_isLoading && _lastLoadedKey != null)
               ElevatedButton.icon(
                 onPressed: () => _fetchImages(loadMore: true),
                 icon: Icon(Icons.arrow_downward),

@@ -66,15 +66,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Logo aplikacji (większe)
                   Image.asset(
                     'assets/logo.png', // Ścieżka do logo
-                    width: MediaQuery.of(context).size.width * 0.5,
-                    height: MediaQuery.of(context).size.height * 0.3,
+                    width: MediaQuery.of(context).size.width * 0.8,
+                    height: MediaQuery.of(context).size.height * 0.5,
                   ),
                   SizedBox(height: 16),
                   // Nazwa aplikacji
                   Text(
                     'NASA Search App',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 48,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
@@ -87,7 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.9),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue, width: 2),
+                      border: Border.all(color: Colors.black, width: 5),
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -127,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             child: Text(
                               'Login',
-                              style: TextStyle(color: Colors.white, fontSize: 18),
+                              style: TextStyle(color: Colors.white, fontSize: 20),
                             ),
                           ),
                         ),

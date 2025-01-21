@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
 import 'package:firebase_storage/firebase_storage.dart';
 import 'image_detail_screen.dart';
 import 'login_screen.dart';
+import 'home_screen_web_analitic.dart';
 
 class HomeScreenWeb extends StatefulWidget {
   @override
@@ -18,6 +19,7 @@ class _HomeScreenState extends State<HomeScreenWeb> {
   List<Map<String, dynamic>> _images = [];
   List<Map<String, dynamic>> _filteredImages = [];
   bool _isAdmin = false;
+  bool _isAnalitic = false;
   bool _isLoading = false;
   int _limit = 6; // Number of images per page
   String? _lastLoadedKey; // To track pagination
@@ -26,6 +28,7 @@ class _HomeScreenState extends State<HomeScreenWeb> {
   void initState() {
     super.initState();
     _checkAdminStatus();
+    _checkAnaliticStatus();
     _fetchImages(); // Wczytujemy pierwsze 6 zdjęć
   }
 
@@ -41,6 +44,29 @@ class _HomeScreenState extends State<HomeScreenWeb> {
         setState(() {
           _isAdmin = doc.data()?['isAdmin'] == true;
         });
+      }
+    }
+  }
+
+  Future<void> _checkAnaliticStatus() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final emailPrefix = user.email?.split('@')[0] ?? '';
+      final doc = await firestore.FirebaseFirestore.instance
+          .collection('users')
+          .doc(emailPrefix)
+          .get();
+      if (doc.exists) {
+        setState(() {
+          _isAnalitic = doc.data()?['isAnalitic'] == true;
+        });
+        
+        if (_isAnalitic) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => HomeScreenWebAnalitic()),
+          );
+        }
       }
     }
   }
@@ -114,7 +140,6 @@ class _HomeScreenState extends State<HomeScreenWeb> {
     }
   }
 
-  // Nowe podejście do wyszukiwania
   Future<void> _searchImagesInDatabase(String query) async {
     if (query.isEmpty) {
       setState(() {
