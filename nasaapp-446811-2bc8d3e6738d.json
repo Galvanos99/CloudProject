@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "nasaapp-446811",
+  "private_key_id": "2bc8d3e6738d746f284ab18bd6ef317ca36de458",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCzGGvBBbGCIltD\n/qIMWK58zYBp9cjr5C0OTaKEnXOeC1vKlB5uVPRWKNbIKyZhD2L70URUACzwOyu3\nncm7ORDQycoyXkvBor7E/SpYuHmko79vIoZELfWroHWcyfYb2ySvF3pa2xjTD/iA\nPFZdSYX21Hk2AsBIflFX/UHP24FbMT8PWuvppRVvh7ec2nrXwP4Ut/Xf3W9qvyMU\n1BcBBk9EPlhPD4z0pZEFGGHIGljwPqlu3uyBiLgh0bH87fsJe6C1pHk+ViiBTuOR\nj9BD+uHEwsyeyzU8qwaRh7fNpSg33Bbhrnz0qJ8aOB+0D9Q0o09/8nVVBXxOqztA\nTt47WIKXAgMBAAECggEAQMzOvB3Tvrqwm/cHagEyTQzL8ErSgmtiVAEKEwKnQSFp\n+m/CXPhXGc+X+wAF2GuJTITIvL39hIRcSokIYzoAGBNTGgtdTLgWX08codJJjSUE\nUHFE9GlOsOUTeQHoDucpLEMJ7dLFdiSarMdoFkPSeV8iZkTzjqdJxlTnmY4aDUS2\nTiAXQ4WhS2XmnJdaEXhH+fZtJVt9lo+36ZFEVTw1s1PAbDItvBa5sZH+9dkwLCiy\nV6jOn9cwz9zu5kYaH1dxbdbbafwOrZwkbouAy9WFlDK+0hblphT4ROIafr25aMwX\n0MslH/vPWSYnuUkgWmgvgD8JwwS7X/VCtAEpnHFMKQKBgQDoS8iuAAjLp09ThPMd\nP5T1K39JFQrr9CT6iJN06AUPXY9GPlg7EpL3xV4KUxrCrOBPMoIetX3A9ERRyrzj\n7joIFdSEBaFxC9spGEgte1mwcaOlibMEuUc0XOcKlSAQTYyRdGXd/liucbUrpFtq\neBSpbHx29eMhLW4bG/TJYJ+QGQKBgQDFXuORuz4rtERlYjJhPXBPKzD8r1m2XEXY\n7KBZ/yG/Ciu6rX0wiAjUom8BwTSo65fYtmCRketQwHCcxoocGEadCAilGcq6WEym\n4IMGvt3cmGmK0Ux3bq6S/cDDfp2snRkADe2xTDo8jfVw27ffJILs3xmUcNLRUSI8\nhDM92z8+LwKBgDlC7R4PPhvNi11gKXmtQa/J4B+Iw190mGT1o7uusgienIHJPoCZ\nTIctLMhIwhD5AnYjUjX1sSEOVYT//94DzGRP1UoSBUDTlluj867aeDppWNimf+2L\nKoU63W0bY4MBSsRUOAQn/X5K40j1w98T6Kv25RuB81IrW7ftBUNawRqJAoGAA1Ml\n4j6VPYc737lXv+uZCLxhhuAtUrUbOBxEVz/FAcLaGbrycO7ZtztFQ3JNwMq3NB9e\nYRVkMWgMfZeam/6MsfiArMdScvEp2WXOzz5H3n9yx7Pe5eQnbLJ5nNF1NoMu+KFD\nb8ko8fwyNkR9RHUI/5SCic2cv4nuWbagZlpbJmECgYBRWcezxxd5LV/DD5R0R59l\nPSVM29HlXzJ8w8+b2rvgNGW1ajbb4YKiwgRVOVb0JBvoRPyfN8m+PzfmmswCAlZY\nNdB8XXXjUVbWuKXyFSOLW65lN/yjk+SpZv7H5KQu6Qmy7YxK6tI+I0HAEcqd3iAk\npf8nE1+RZv6Qo+EQusv9gQ==\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-3dqbk@nasaapp-446811.iam.gserviceaccount.com",
+  "client_id": "107573027719661446771",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-3dqbk%40nasaapp-446811.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

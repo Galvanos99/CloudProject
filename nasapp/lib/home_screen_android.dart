@@ -97,8 +97,9 @@ Future<void> _createThumbnail(String imageUrl) async {
 
 Future<void> _fetchImages({bool loadMore = false}) async {
   if (_isLoading) return;
+  
   setState(() {
-    _isLoading = true;
+    _isLoading = true; // Włącz loader przed rozpoczęciem procesu
   });
 
   try {
@@ -123,26 +124,24 @@ Future<void> _fetchImages({bool loadMore = false}) async {
         }
 
         final filePath = image['url'];
-          if (filePath != null) {
-            final thumbnailPath = 'thumbnails/${Uri.parse(filePath).pathSegments.last}';
-            final ref = FirebaseStorage.instance.ref(thumbnailPath);
-            try {
-              // Sprawdź, czy miniatura istnieje
-              final url = await ref.getDownloadURL();
-              image['url'] = url;
-            } catch (e) {
-              // Jeśli miniatura nie istnieje, utwórz ją
-              print('Thumbnail not found. Creating one for $filePath...');
-              await _createThumbnail(filePath);
-
-              // Poczekaj, aż miniatura zostanie utworzona i pobierz jej URL
-              final url = await ref.getDownloadURL();
-              image['url'] = url;
-            }
-            images.add(image);
+        if (filePath != null) {
+          final thumbnailPath = 'thumbnails/${Uri.parse(filePath).pathSegments.last}';
+          final ref = FirebaseStorage.instance.ref(thumbnailPath);
+          try {
+            // Sprawdź, czy miniatura istnieje
+            final url = await ref.getDownloadURL();
+            image['url'] = url;
+          } catch (e) {
+            // Jeśli miniatura nie istnieje, utwórz ją
+            await _createThumbnail(filePath);
+            final url = await ref.getDownloadURL();
+            image['url'] = url;
           }
+          images.add(image);
+        }
       }
 
+      // Aktualizacja stanu po zakończeniu całego procesu
       setState(() {
         _images.addAll(images);
         _filteredImages = _images;
@@ -157,11 +156,13 @@ Future<void> _fetchImages({bool loadMore = false}) async {
   } catch (e) {
     print('Error fetching images: $e');
   } finally {
+    // Wyłącz loader po zakończeniu procesu
     setState(() {
       _isLoading = false;
     });
   }
 }
+
 
 
 Future<void> _searchThumbnailsInStorage(String query) async {
@@ -211,121 +212,110 @@ String _formatTitle(String fileName) {
 }
 
 
-  @override
-  Widget build(BuildContext context) {
-    if (_isCreatingThumbnails) {
-      return Center(
-        child: CircularProgressIndicator(),
-      );
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        title: Row(
-          children: [
-            IconButton(
-              icon: Icon(Icons.logout, color: Colors.white),
-              onPressed: _logout,
-            ),
-            SizedBox(width: 10),
-            Text('NASA Search App', style: TextStyle(color: Colors.white)),
-          ],
-        ),
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      backgroundColor: Colors.black,
+      title: Row(
+        children: [
+          IconButton(
+            icon: Icon(Icons.logout, color: Colors.white),
+            onPressed: _logout,
+          ),
+          SizedBox(width: 10),
+          Text('NASA Search App', style: TextStyle(color: Colors.white)),
+        ],
       ),
-      body: Container(
-        color: Colors.black,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        labelText: 'Search',
-                        labelStyle: TextStyle(color: Colors.white),
-                        border: OutlineInputBorder(),
-                      ),
-                      style: TextStyle(color: Colors.white),
-                      onSubmitted: _searchThumbnailsInStorage,
+    ),
+    body: Container(
+      color: Colors.black,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      labelText: 'Search',
+                      labelStyle: TextStyle(color: Colors.white),
+                      border: OutlineInputBorder(),
                     ),
+                    style: TextStyle(color: Colors.white),
+                    onSubmitted: _searchThumbnailsInStorage,
                   ),
-                  SizedBox(width: 10),
-                  ElevatedButton(
-                    onPressed: () =>
-                        _searchThumbnailsInStorage(_searchController.text),
-                    child: Text('Search'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                    ),
+                ),
+                SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: () =>
+                      _searchThumbnailsInStorage(_searchController.text),
+                  child: Text('Search'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            Expanded(
-              child: _isCreatingThumbnails
-                  ? Center(child: CircularProgressIndicator())
-                  : _filteredImages.isEmpty
-                      ? Center(
-                          child: Text(
-                            'No results found',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        )
-                      : ListView.builder(
-                          itemCount: _filteredImages.length,
-                          itemBuilder: (context, index) {
-                            final image = _filteredImages[index];
-                            return Container(
-                              margin: const EdgeInsets.symmetric(vertical: 8.0),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.white),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Image.network(
-                                    image['url'],
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) => Center(
-                                      child: Icon(Icons.error),
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.all(8.0),
-                                    color: Colors.black54,
-                                    child: Text(
-                                      image['title'] ?? 'No title',
-                                      style: TextStyle(color: Colors.white),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
+          ),
+          Expanded(
+            child: _isLoading
+                ? Center(child: CircularProgressIndicator()) // Loader na czas całego procesu
+                : _filteredImages.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No results found',
+                          style: TextStyle(color: Colors.white),
                         ),
+                      )
+                    : ListView.builder(
+                        itemCount: _filteredImages.length,
+                        itemBuilder: (context, index) {
+                          final image = _filteredImages[index];
+                          return Container(
+                            margin: const EdgeInsets.symmetric(vertical: 8.0),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.white),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Image.network(
+                                  image['url'],
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Center(child: Icon(Icons.error)),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.all(8.0),
+                                  color: Colors.black54,
+                                  child: Text(
+                                    image['title'] ?? 'No title',
+                                    style: TextStyle(color: Colors.white),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+          ),
+          if (!_isLoading && _lastLoadedKey != null)
+            ElevatedButton.icon(
+              onPressed: () => _fetchImages(loadMore: true),
+              icon: Icon(Icons.arrow_downward),
+              label: Text('Load More'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
             ),
-            if (_isLoading)
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: CircularProgressIndicator(),
-              ),
-              if (!_isLoading && _lastLoadedKey != null)
-              ElevatedButton.icon(
-                onPressed: () => _fetchImages(loadMore: true),
-                icon: Icon(Icons.arrow_downward),
-                label: Text('Load More'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.black),
-              ),
-          ],
-        ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
+
 }

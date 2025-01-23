@@ -26,6 +26,7 @@ class _HomeScreenWebAnaliticState extends State<HomeScreenWebAnalitic> {
   final double maxStorageLimit = 1.0 * 1024.0; // Max Storage in MB (100GB)
   bool isDataLoaded = false; // Flag to track if data is loaded
   int createThumbnailsCounter = 0; // Licznik dla create_thumbnails
+  int delete_old_thumbnailsCounter = 0; // Licznik dla delete_old_thumbnails
 
   
   int smallestFileSize = 0; // W bajtach
@@ -131,6 +132,15 @@ class _HomeScreenWebAnaliticState extends State<HomeScreenWebAnalitic> {
     if (doc.exists) {
       setState(() {
         createThumbnailsCounter = doc['counter'] ?? 0;
+      });
+    }
+    final doc2 = await FirebaseFirestore.instance
+        .collection('analytics')
+        .doc('delete_old_thumbnails')
+        .get();
+    if (doc2.exists) {
+      setState(() {
+        delete_old_thumbnailsCounter = doc2['counter'] ?? 0;
       });
     }
   } catch (e) {
@@ -253,6 +263,11 @@ Widget build(BuildContext context) {
                         SizedBox(height: 10),
                         Text(
                           'create_thumbnails: $createThumbnailsCounter',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          'delete_old_thumbnails: $delete_old_thumbnailsCounter',
                           style: TextStyle(color: Colors.white),
                         ),
                       ],

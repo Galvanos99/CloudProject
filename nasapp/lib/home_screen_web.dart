@@ -32,44 +32,43 @@ class _HomeScreenState extends State<HomeScreenWeb> {
     _fetchImages(); // Wczytujemy pierwsze 6 zdjęć
   }
 
-  Future<void> _checkAdminStatus() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final emailPrefix = user.email?.split('@')[0] ?? '';
-      final doc = await firestore.FirebaseFirestore.instance
-          .collection('users')
-          .doc(emailPrefix)
-          .get();
-      if (doc.exists) {
-        setState(() {
-          _isAdmin = doc.data()?['isAdmin'] == true;
-        });
-      }
+Future<void> _checkAdminStatus() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    final doc = await firestore.FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid) // Używamy uid zamiast prefixu emaila
+        .get();
+    if (doc.exists) {
+      setState(() {
+        _isAdmin = doc.data()?['isAdmin'] == true;
+      });
     }
   }
+}
 
-  Future<void> _checkAnaliticStatus() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final emailPrefix = user.email?.split('@')[0] ?? '';
-      final doc = await firestore.FirebaseFirestore.instance
-          .collection('users')
-          .doc(emailPrefix)
-          .get();
-      if (doc.exists) {
-        setState(() {
-          _isAnalitic = doc.data()?['isAnalitic'] == true;
-        });
-        
-        if (_isAnalitic) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => HomeScreenWebAnalitic()),
-          );
-        }
+Future<void> _checkAnaliticStatus() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    final doc = await firestore.FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid) // Używamy uid zamiast prefixu emaila
+        .get();
+    if (doc.exists) {
+      setState(() {
+        _isAnalitic = doc.data()?['isAnalitic'] == true;
+      });
+      
+      if (_isAnalitic) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomeScreenWebAnalitic()),
+        );
       }
     }
   }
+}
+
 
   Future<void> _logout() async {
     await FirebaseAuth.instance.signOut();
